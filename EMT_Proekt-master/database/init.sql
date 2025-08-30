@@ -14,11 +14,12 @@ CREATE TABLE subjects (
                           code VARCHAR(20) NOT NULL UNIQUE,
                           name VARCHAR(255) NOT NULL,
                           semester VARCHAR(50) NOT NULL,
-                          year INTEGER NOT NULL CHECK (year >= 1 AND year <= 4),
-    professor VARCHAR(255),
-    assistant VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                          year INTEGER NOT NULL,
+                          professor VARCHAR(255),
+                          assistant VARCHAR(255),
+                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 
 -- Табела за корисници
 CREATE TABLE users (
@@ -36,7 +37,7 @@ CREATE TABLE assignments (
                              id BIGSERIAL PRIMARY KEY,
                              title VARCHAR(255) NOT NULL,
                              description TEXT,
-                             points INTEGER NOT NULL CHECK (points >= 1 AND points <= 100),
+                             max_points INTEGER NOT NULL CHECK (max_points >= 1 AND max_points <= 100),
                              requirements TEXT,
                              subject_id BIGINT NOT NULL,
                              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -133,7 +134,7 @@ INSERT INTO users (first_name, last_name, email, role, index_number) VALUES
 ('Милена', 'Тасевска', 'milena.tasevska@finki.ukim.mk', 'АСИСТЕНТ', NULL);
 
 -- Вметни assignments
-INSERT INTO assignments (title, description, points, requirements, subject_id) VALUES
+INSERT INTO assignments (title, description, max_points, requirements, subject_id) VALUES
                                                                                    ('Лабораториска вежба 1', 'Основни концепти на програмирање', 15,
                                                                                     'Напишете програма која чита два броја и го печати нивниот збир, разлика, производ и количник.', 1),
 
@@ -218,8 +219,8 @@ SELECT
     COUNT(ua.id) as total_submissions,
     COUNT(CASE WHEN ua.grade IS NOT NULL THEN 1 END) as graded_submissions,
     ROUND(AVG(ua.grade::numeric), 2) as average_grade,
-    SUM(CASE WHEN ua.grade IS NOT NULL THEN a.points ELSE 0 END) as total_points_earned,
-    SUM(CASE WHEN ua.grade IS NOT NULL THEN a.points ELSE 0 END) as total_possible_points
+    SUM(CASE WHEN ua.grade IS NOT NULL THEN a.max_points ELSE 0 END) as total_points_earned,
+    SUM(CASE WHEN ua.grade IS NOT NULL THEN a.max_points ELSE 0 END) as total_possible_points
 FROM users u
          LEFT JOIN user_assignments ua ON u.id = ua.user_id
          LEFT JOIN assignments a ON ua.assignment_id = a.id
@@ -232,7 +233,7 @@ SELECT
     a.id,
     a.title,
     a.description,
-    a.points,
+    a.max_points,
     a.requirements,
     a.created_at,
     s.code as subject_code,
@@ -246,7 +247,7 @@ FROM assignments a
          JOIN subjects s ON a.subject_id = s.id
          LEFT JOIN user_assignments ua ON a.id = ua.assignment_id
          LEFT JOIN assignment_files af ON a.id = af.assignment_id
-GROUP BY a.id, a.title, a.description, a.points, a.requirements, a.created_at,
+GROUP BY a.id, a.title, a.description, a.max_points, a.requirements, a.created_at,
          s.code, s.name, s.semester;
 
 -- Stored procedures за често користени операции

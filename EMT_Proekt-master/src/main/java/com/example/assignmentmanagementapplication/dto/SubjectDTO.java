@@ -1,5 +1,6 @@
 package com.example.assignmentmanagementapplication.dto;
 
+import com.example.assignmentmanagementapplication.model.Subject;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;

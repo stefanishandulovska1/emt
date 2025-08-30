@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,11 +38,12 @@ public class AssignmentController {
     @GetMapping
     public ResponseEntity<List<AssignmentDTO>> getAllAssignments() {
         List<Assignment> assignments = assignmentService.findAll();
-        List<AssignmentDTO> assignmentDTOs = assignments.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        List<AssignmentDTO> assignmentDTOs = assignments != null
+                ? assignments.stream().map(this::convertToDTO).collect(Collectors.toList())
+                : new ArrayList<>();
         return ResponseEntity.ok(assignmentDTOs);
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<AssignmentDTO> getAssignmentById(@PathVariable Long id) {

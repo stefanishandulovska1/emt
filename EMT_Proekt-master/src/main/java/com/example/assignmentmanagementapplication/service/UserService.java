@@ -29,6 +29,10 @@ public class UserService {
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
+    public List<User> findByRoleIn(List<String> roles) {
+        return userRepository.findByRoleIn(roles);
+    }
+
 
     public User save(User user) {
         // Проверка дали email адресата веќе постои
@@ -98,4 +102,8 @@ public class UserService {
     public long countByRole(UserRole role) {
         return userRepository.countByRole(role);
     }
+    public List<User> findStudentsBySubjectId(Long subjectId) {
+        return userRepository.findStudentsBySubjectId(subjectId);
+    }
+
 }

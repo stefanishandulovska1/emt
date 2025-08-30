@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,11 +29,12 @@ public class UserController {
     @GetMapping
     public ResponseEntity<List<UserDTO>> getAllUsers() {
         List<User> users = userService.findAll();
-        List<UserDTO> userDTOs = users.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        List<UserDTO> userDTOs = users != null
+                ? users.stream().map(this::convertToDTO).collect(Collectors.toList())
+                : new ArrayList<>();
         return ResponseEntity.ok(userDTOs);
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
@@ -119,6 +121,13 @@ public class UserController {
     public ResponseEntity<Long> getUsersCountByRole(@PathVariable UserRole role) {
         return ResponseEntity.ok(userService.countByRole(role));
     }
+    @GetMapping("/subject/{subjectId}/students")
+    public ResponseEntity<List<UserDTO>> getStudentsBySubject(@PathVariable Long subjectId) {
+        List<User> students = userService.findStudentsBySubjectId(subjectId);
+        List<UserDTO> dtos = students.stream().map(this::convertToDTO).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
 
     // Helper methods
     private UserDTO convertToDTO(User user) {
@@ -143,4 +152,11 @@ public class UserController {
         user.setIndexNumber(dto.getIndexNumber());
         return user;
     }
+    @GetMapping("/users/staff")
+    public ResponseEntity<List<UserDTO>> getStaff() {
+        List<User> staff = userService.findByRoleIn(List.of("НАСТАВНИК", "АСИСТЕНТ"));
+        List<UserDTO> dtos = staff.stream().map(this::convertToDTO).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
 }

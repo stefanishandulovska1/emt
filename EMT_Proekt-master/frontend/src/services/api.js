@@ -19,12 +19,12 @@ class ApiService {
 
             // <--- ОВДЕ СМЕНИ! (204 не враќа body)
             if (response.status === 204) {
-                return; // no content for DELETE/PUT
+                return undefined; // no content for DELETE/PUT
             }
 
             // (ако има Content-Length = 0 или body е празен, врати undefined)
             const text = await response.text();
-            if (!text) return undefined;
+            if (!text) return [];
             return JSON.parse(text);
         } catch (error) {
             console.error('API Error:', error);
@@ -119,10 +119,13 @@ class ApiService {
     async searchUsers(term) {
         return this.fetchWithErrorHandling(`${API_BASE}/users/search?term=${encodeURIComponent(term)}`);
     }
+    async getStudentsForSubject(subjectId) {
+        return this.fetchWithErrorHandling(`${API_BASE}/users/subject/${subjectId}/students`);
+    }
 
     // User Assignments API
     async getUserAssignments() {
-        return this.fetchWithErrorHandling(`${API_BASE}/user-assignments`);
+        return this.fetchWithErrorHandling(`${API_BASE}/submissions`);
     }
 }
 

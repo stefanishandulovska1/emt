@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,11 +28,12 @@ public class SubjectController {
     @GetMapping
     public ResponseEntity<List<SubjectDTO>> getAllSubjects() {
         List<Subject> subjects = subjectService.findAll();
-        List<SubjectDTO> subjectDTOs = subjects.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        List<SubjectDTO> subjectDTOs = subjects != null
+                ? subjects.stream().map(this::convertToDTO).collect(Collectors.toList())
+                : new ArrayList<>();
         return ResponseEntity.ok(subjectDTOs);
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<SubjectDTO> getSubjectById(@PathVariable Long id) {
@@ -126,7 +128,8 @@ public class SubjectController {
         dto.setName(subject.getName());
         dto.setSemester(subject.getSemester());
         dto.setYear(subject.getYear());
-        dto.setProfessor(subject.getProfessor()); // direct string mapping
+        dto.setProfessor(subject.getProfessor());
+        dto.setAssistant(subject.getAssistant()); // ДОДАДИ ОВА!
         dto.setAssignmentCount(subject.getAssignments() != null ? subject.getAssignments().size() : 0);
         return dto;
     }
@@ -138,7 +141,9 @@ public class SubjectController {
         subject.setName(dto.getName());
         subject.setSemester(dto.getSemester());
         subject.setYear(dto.getYear());
-        subject.setProfessor(dto.getProfessor()); // direct string mapping
+        subject.setProfessor(dto.getProfessor());
+        subject.setAssistant(dto.getAssistant()); // ДОДАДИ ОВА!
         return subject;
     }
+
 }

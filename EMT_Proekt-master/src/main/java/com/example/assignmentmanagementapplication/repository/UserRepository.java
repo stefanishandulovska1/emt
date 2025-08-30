@@ -27,4 +27,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findBySearchTerm(@Param("searchTerm") String searchTerm);
 
     long countByRole(UserRole role);
+    List<User> findByRoleIn(List<String> roles);
+    @Query("SELECT DISTINCT u FROM User u JOIN u.userAssignments ua WHERE ua.assignment.subject.id = :subjectId AND u.role = 'СТУДЕНТ'")
+    List<User> findStudentsBySubjectId(@Param("subjectId") Long subjectId);
+
 }

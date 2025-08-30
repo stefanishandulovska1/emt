@@ -52,6 +52,7 @@ public class SubjectService {
         subject.setName(subjectDetails.getName());
         subject.setSemester(subjectDetails.getSemester());
         subject.setYear(subjectDetails.getYear());
+        subject.setAssistant(subjectDetails.getAssistant());
         subject.setProfessor(subjectDetails.getProfessor());
 
         return subjectRepository.save(subject);

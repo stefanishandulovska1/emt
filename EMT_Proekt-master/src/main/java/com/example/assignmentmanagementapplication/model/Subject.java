@@ -1,5 +1,6 @@
 package com.example.assignmentmanagementapplication.model;
 
+import com.example.assignmentmanagementapplication.dto.SubjectDTO;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -52,6 +53,18 @@ public class Subject {
         this.professor = professor;
         this.assistant = assistant;
     }
+    private Subject convertToEntity(SubjectDTO dto) {
+        Subject subject = new Subject();
+        subject.setId(dto.getId());
+        subject.setCode(dto.getCode());
+        subject.setName(dto.getName());
+        subject.setSemester(dto.getSemester());
+        subject.setYear(dto.getYear());
+        subject.setProfessor(dto.getProfessor());
+        subject.setAssistant(dto.getAssistant());   // ДОДАДИ ОВА!
+        return subject;
+    }
+
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

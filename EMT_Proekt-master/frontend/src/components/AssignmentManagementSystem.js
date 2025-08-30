@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useRef } from 'react';
 import { Search, Plus, Edit, Trash2, Download, Upload, Users, BookOpen, Award, BarChart3 } from 'lucide-react';
 import apiService from '../services/api';
 
@@ -7,6 +7,10 @@ import apiService from '../services/api';
         const [subjects, setSubjects] = useState([]);
         const [assignments, setAssignments] = useState([]);
         const [users, setUsers] = useState([]);
+
+        const professors = users.filter(u => u.role === 'НАСТАВНИК');
+        const assistants = users.filter(u => u.role === 'АСИСТЕНТ');
+
         const [userAssignments, setUserAssignments] = useState([]);
         const [loading, setLoading] = useState(false);
 
@@ -23,9 +27,10 @@ import apiService from '../services/api';
         const [assignmentForm, setAssignmentForm] = useState({
             title: '',
             description: '',
-            points: '',
+            points: '1',
             requirements: '',
-            subjectId: ''
+            subjectId: '',
+            dueDate:'',
         });
 
         const [userForm, setUserForm] = useState({
@@ -42,6 +47,11 @@ import apiService from '../services/api';
             assignments: '',
             users: ''
         });
+
+        const subjectFormRef = useRef(null);
+        const assignmentFormRef = useRef(null);
+        const userFormRef = useRef(null);
+
 
         // Fetch data functions using API service
         const fetchSubjects = async () => {
@@ -124,9 +134,18 @@ import apiService from '../services/api';
         };
 
         const handleSubjectEdit = (subject) => {
-            setSubjectForm(subject);
+            setSubjectForm({
+                code: subject.code || '',
+                name: subject.name || '',
+                semester: subject.semester || '',
+                year: subject.year || 1,
+                professor: subject.professor || '',
+                assistant: subject.assistant || ''   // Обезбеди го ова поле тука секогаш!
+            });
             setEditingItem(subject.id);
+            if (subjectFormRef.current) subjectFormRef.current.scrollIntoView({ behavior: 'smooth' });
         };
+
 
         const handleSubjectDelete = async (id) => {
             if (window.confirm('Дали сте сигурни дека сакате да го избришете овој предмет?')) {
@@ -148,15 +167,25 @@ import apiService from '../services/api';
             e.preventDefault();
             try {
                 setLoading(true);
+
+                const assignmentData = {
+                    ...assignmentForm,
+                    points: assignmentForm.points === "" ? 1 : Number(assignmentForm.points), // Ако е празно, default: 1
+                    subjectId: Number(assignmentForm.subjectId),
+                    dueDate: assignmentForm.dueDate
+                        ? (assignmentForm.dueDate.length === 16
+                            ? assignmentForm.dueDate + ':00'
+                            : assignmentForm.dueDate)
+                        : null,
+                };
                 if (editingItem) {
-                    await apiService.updateAssignment(editingItem, assignmentForm);
+                    await apiService.updateAssignment(editingItem, assignmentData);
                     showNotification('success', 'Assignment е успешно ажуриран!');
                 } else {
-                    await apiService.createAssignment(assignmentForm);
+                    await apiService.createAssignment(assignmentData);
                     showNotification('success', 'Assignment е успешно додаден!');
                 }
-
-                setAssignmentForm({ title: '', description: '', points: '', requirements: '', subjectId: '' });
+                setAssignmentForm({ title: '', description: '', points: 1, requirements: '', subjectId: '', dueDate: '' });
                 setEditingItem(null);
                 fetchAssignments();
             } catch (error) {
@@ -166,9 +195,11 @@ import apiService from '../services/api';
             }
         };
 
+
         const handleAssignmentEdit = (assignment) => {
             setAssignmentForm(assignment);
             setEditingItem(assignment.id);
+            if (assignmentFormRef.current) assignmentFormRef.current.scrollIntoView({ behavior: 'smooth' });
         };
 
         const handleAssignmentDelete = async (id) => {
@@ -212,6 +243,7 @@ import apiService from '../services/api';
         const handleUserEdit = (user) => {
             setUserForm(user);
             setEditingItem(user.id);
+            if (userFormRef.current) userFormRef.current.scrollIntoView({ behavior: 'smooth' });
         };
 
         const handleUserDelete = async (id) => {
@@ -290,7 +322,8 @@ import apiService from '../services/api';
             const rows = data.map(obj => Object.values(obj).map(val =>
                 typeof val === 'string' && val.includes(',') ? `"${val}"` : val
             ).join(','));
-            const csv = [headers, ...rows].join('\n');
+            const BOM = "\uFEFF";
+            const csv = BOM + [headers, ...rows].join('\n');
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
@@ -411,12 +444,13 @@ import apiService from '../services/api';
                                         <Plus className="mr-2" size={20} />
                                         {editingItem ? 'Ажурирај Предмет' : 'Додај Нов Предмет'}
                                     </h3>
-                                    <form onSubmit={handleSubjectSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <form onSubmit={handleSubjectSubmit} ref={subjectFormRef}
+                                          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <input
                                             type="text"
                                             placeholder="Код на предмет (пр. CS101)"
                                             value={subjectForm.code}
-                                            onChange={(e) => setSubjectForm({ ...subjectForm, code: e.target.value })}
+                                            onChange={(e) => setSubjectForm({...subjectForm, code: e.target.value})}
                                             className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             required
                                         />
@@ -424,7 +458,7 @@ import apiService from '../services/api';
                                             type="text"
                                             placeholder="Име на предмет"
                                             value={subjectForm.name}
-                                            onChange={(e) => setSubjectForm({ ...subjectForm, name: e.target.value })}
+                                            onChange={(e) => setSubjectForm({...subjectForm, name: e.target.value})}
                                             className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             required
                                         />
@@ -432,13 +466,16 @@ import apiService from '../services/api';
                                             type="text"
                                             placeholder="Семестар (пр. 2024/1)"
                                             value={subjectForm.semester}
-                                            onChange={(e) => setSubjectForm({ ...subjectForm, semester: e.target.value })}
+                                            onChange={(e) => setSubjectForm({...subjectForm, semester: e.target.value})}
                                             className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             required
                                         />
                                         <select
                                             value={subjectForm.year}
-                                            onChange={(e) => setSubjectForm({ ...subjectForm, year: parseInt(e.target.value) })}
+                                            onChange={(e) => setSubjectForm({
+                                                ...subjectForm,
+                                                year: parseInt(e.target.value)
+                                            })}
                                             className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         >
                                             <option value={1}>Прва година</option>
@@ -446,20 +483,31 @@ import apiService from '../services/api';
                                             <option value={3}>Трета година</option>
                                             <option value={4}>Четврта година</option>
                                         </select>
-                                        <input
-                                            type="text"
-                                            placeholder="Професор"
+                                        <select
                                             value={subjectForm.professor}
-                                            onChange={(e) => setSubjectForm({ ...subjectForm, professor: e.target.value })}
+                                            onChange={e => setSubjectForm({...subjectForm, professor: e.target.value})}
                                             className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Асистент"
+                                            required
+                                        >
+                                            <option value="">Избери професор</option>
+                                            {professors.map(prof => (
+                                                <option key={prof.id} value={prof.firstName + ' ' + prof.lastName}>
+                                                    {prof.firstName} {prof.lastName} ({prof.email})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <select
                                             value={subjectForm.assistant}
-                                            onChange={(e) => setSubjectForm({ ...subjectForm, assistant: e.target.value })}
+                                            onChange={e => setSubjectForm({...subjectForm, assistant: e.target.value})}
                                             className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
+                                        >
+                                            <option value="">Избери асистент</option>
+                                            {assistants.map(ast => (
+                                                <option key={ast.id} value={ast.firstName + ' ' + ast.lastName}>
+                                                    {ast.firstName} {ast.lastName} ({ast.email})
+                                                </option>
+                                            ))}
+                                        </select>
                                         <div className="flex space-x-2">
                                             <button
                                                 type="submit"
@@ -472,7 +520,14 @@ import apiService from '../services/api';
                                                     type="button"
                                                     onClick={() => {
                                                         setEditingItem(null);
-                                                        setSubjectForm({ code: '', name: '', semester: '', year: 1, professor: '', assistant: '' });
+                                                        setSubjectForm({
+                                                            code: '',
+                                                            name: '',
+                                                            semester: '',
+                                                            year: 1,
+                                                            professor: '',
+                                                            assistant: ''
+                                                        });
                                                     }}
                                                     className="px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
                                                 >
@@ -486,7 +541,7 @@ import apiService from '../services/api';
                                 {/* Search and Export */}
                                 <div className="flex flex-wrap gap-4 mb-6">
                                     <div className="flex-1 relative">
-                                        <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+                                        <Search className="absolute left-3 top-3 text-gray-400" size={20}/>
                                         <input
                                             type="text"
                                             placeholder="Пребарај предмети..."
@@ -550,16 +605,27 @@ import apiService from '../services/api';
                                                     onClick={() => handleSubjectEdit(subject)}
                                                     className="flex items-center space-x-1 px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
                                                 >
-                                                    <Edit size={16} />
+                                                    <Edit size={16}/>
                                                     <span>Ажурирај</span>
                                                 </button>
                                                 <button
                                                     onClick={() => handleSubjectDelete(subject.id)}
                                                     className="flex items-center space-x-1 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
                                                 >
-                                                    <Trash2 size={16} />
+                                                    <Trash2 size={16}/>
                                                     <span>Избриши</span>
                                                 </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        const students = await apiService.getStudentsForSubject(subject.id);
+                                                        exportToCSV(students, `studenti-za-predmet-${subject.code}`);
+                                                    }}
+                                                    className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                                >
+                                                    <Download size={16}/>
+                                                    <span>Студенти CSV</span>
+                                                </button>
+
                                             </div>
                                         </div>
                                     ))}
@@ -596,13 +662,16 @@ import apiService from '../services/api';
                                         <Plus className="mr-2" size={20} />
                                         {editingItem ? 'Ажурирај Assignment' : 'Додај Нов Assignment'}
                                     </h3>
-                                    <form onSubmit={handleAssignmentSubmit} className="space-y-4">
+                                    <form onSubmit={handleAssignmentSubmit} ref={assignmentFormRef} className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <input
                                                 type="text"
                                                 placeholder="Наслов на assignment"
                                                 value={assignmentForm.title}
-                                                onChange={(e) => setAssignmentForm({ ...assignmentForm, title: e.target.value })}
+                                                onChange={(e) => setAssignmentForm({
+                                                    ...assignmentForm,
+                                                    title: e.target.value
+                                                })}
                                                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 required
                                             />
@@ -610,7 +679,17 @@ import apiService from '../services/api';
                                                 type="number"
                                                 placeholder="Број на поени (1-100)"
                                                 value={assignmentForm.points}
-                                                onChange={(e) => setAssignmentForm({ ...assignmentForm, points: e.target.value })}
+                                                min="1"
+                                                max="100"
+                                                required
+                                                onChange={e => {
+                                                    // Не дозволувај празно
+                                                    if (e.target.value === "") {
+                                                        setAssignmentForm({ ...assignmentForm, points: 1 });
+                                                    } else {
+                                                        setAssignmentForm({ ...assignmentForm, points: e.target.value });
+                                                    }
+                                                }}
                                                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 min="1"
                                                 max="100"
@@ -620,20 +699,39 @@ import apiService from '../services/api';
                                         <textarea
                                             placeholder="Краток опис на assignment"
                                             value={assignmentForm.description}
-                                            onChange={(e) => setAssignmentForm({ ...assignmentForm, description: e.target.value })}
+                                            onChange={(e) => setAssignmentForm({
+                                                ...assignmentForm,
+                                                description: e.target.value
+                                            })}
                                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             rows="3"
                                         />
                                         <textarea
                                             placeholder="Детални барања за assignment"
                                             value={assignmentForm.requirements}
-                                            onChange={(e) => setAssignmentForm({ ...assignmentForm, requirements: e.target.value })}
+                                            onChange={(e) => setAssignmentForm({
+                                                ...assignmentForm,
+                                                requirements: e.target.value
+                                            })}
                                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             rows="4"
                                         />
+                                        <input
+                                            type="datetime-local"
+                                            placeholder="Датум на предавање"
+                                            value={assignmentForm.dueDate}
+                                            onChange={e => setAssignmentForm({
+                                                ...assignmentForm,
+                                                dueDate: e.target.value
+                                            })}
+                                        />
+
                                         <select
                                             value={assignmentForm.subjectId}
-                                            onChange={(e) => setAssignmentForm({ ...assignmentForm, subjectId: e.target.value })}
+                                            onChange={(e) => setAssignmentForm({
+                                                ...assignmentForm,
+                                                subjectId: e.target.value
+                                            })}
                                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             required
                                         >
@@ -656,7 +754,13 @@ import apiService from '../services/api';
                                                     type="button"
                                                     onClick={() => {
                                                         setEditingItem(null);
-                                                        setAssignmentForm({ title: '', description: '', points: '', requirements: '', subjectId: '' });
+                                                        setAssignmentForm({
+                                                            title: '',
+                                                            description: '',
+                                                            points: '',
+                                                            requirements: '',
+                                                            subjectId: ''
+                                                        });
                                                     }}
                                                     className="px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
                                                 >
@@ -669,7 +773,7 @@ import apiService from '../services/api';
 
                                 {/* Search and Export */}
                                 <div className="flex flex-wrap gap-4 mb-6">
-                                    <div className="flex-1 relative">
+                                <div className="flex-1 relative">
                                         <Search className="absolute left-3 top-3 text-gray-400" size={20} />
                                         <input
                                             type="text"
@@ -788,7 +892,7 @@ import apiService from '../services/api';
                                         <Plus className="mr-2" size={20} />
                                         {editingItem ? 'Ажурирај Корисник' : 'Додај Нов Корисник'}
                                     </h3>
-                                    <form onSubmit={handleUserSubmit} className="space-y-4">
+                                    <form onSubmit={handleUserSubmit} ref={userFormRef} className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <input
                                                 type="text"
@@ -861,13 +965,13 @@ import apiService from '../services/api';
                                 {/* Search and Export */}
                                 <div className="flex flex-wrap gap-4 mb-6">
                                     <div className="flex-1 relative">
-                                        <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+                                        <Search className="absolute left-3 top-3 text-gray-400" size={20}/>
                                         <input
                                             type="text"
                                             placeholder="Пребарај корисници..."
                                             value={searchTerms.users}
                                             onChange={(e) => {
-                                                setSearchTerms({ ...searchTerms, users: e.target.value });
+                                                setSearchTerms({...searchTerms, users: e.target.value});
                                                 handleSearch('users', e.target.value);
                                             }}
                                             className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -877,22 +981,45 @@ import apiService from '../services/api';
                                         onClick={() => exportToCSV(users, 'korisnici')}
                                         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
                                     >
-                                        <Download size={16} />
+                                        <Download size={16}/>
                                         <span>CSV</span>
                                     </button>
                                     <button
                                         onClick={() => exportToJSON(users, 'korisnici')}
                                         className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
                                     >
-                                        <Download size={16} />
+                                        <Download size={16}/>
                                         <span>JSON</span>
                                     </button>
+                                    <button
+                                        onClick={() => exportToCSV(users.filter(u => u.role === 'СТУДЕНТ'), 'korisnici-studenti')}
+                                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
+                                    >
+                                        <Download size={16}/>
+                                        <span>Студенти CSV</span>
+                                    </button>
+                                    <button
+                                        onClick={() => exportToCSV(users.filter(u => u.role === 'НАСТАВНИК'), 'korisnici-nastavnici')}
+                                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
+                                    >
+                                        <Download size={16}/>
+                                        <span>Професори CSV</span>
+                                    </button>
+                                    <button
+                                        onClick={() => exportToCSV(users.filter(u => u.role === 'АСИСТЕНТ'), 'korisnici-asistenti')}
+                                        className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center space-x-2"
+                                    >
+                                        <Download size={16}/>
+                                        <span>Асистенти CSV</span>
+                                    </button>
+
                                 </div>
 
                                 {/* Users List */}
                                 <div className="grid gap-4">
                                     {getFilteredUsers().map((user) => (
-                                        <div key={user.id} className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                                        <div key={user.id}
+                                             className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
                                             <div className="flex justify-between items-start mb-4">
                                                 <div>
                                                     <h3 className="text-xl font-semibold text-gray-800">

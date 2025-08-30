@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -20,7 +21,9 @@ public class SubmissionController {
 
     @GetMapping
     public ResponseEntity<List<Submission>> getAllSubmissions() {
-        return ResponseEntity.ok(submissionService.findAll());
+        List<Submission> submissions = submissionService.findAll();
+        if (submissions == null) submissions = new ArrayList<>();
+        return ResponseEntity.ok(submissions);
     }
 
     @GetMapping("/{id}")
@@ -75,11 +78,15 @@ public class SubmissionController {
 
     @GetMapping("/student/{studentId}")
     public ResponseEntity<List<Submission>> getSubmissionsByStudent(@PathVariable Long studentId) {
-        return ResponseEntity.ok(submissionService.findByStudentId(studentId));
+        List<Submission> submissions = submissionService.findByStudentId(studentId);
+        if (submissions == null) submissions = new ArrayList<>();
+        return ResponseEntity.ok(submissions);
     }
 
     @GetMapping("/assignment/{assignmentId}")
     public ResponseEntity<List<Submission>> getSubmissionsByAssignment(@PathVariable Long assignmentId) {
-        return ResponseEntity.ok(submissionService.findByAssignmentId(assignmentId));
+        List<Submission> submissions = submissionService.findByAssignmentId(assignmentId);
+        if (submissions == null) submissions = new ArrayList<>();
+        return ResponseEntity.ok(submissions);
     }
 }
