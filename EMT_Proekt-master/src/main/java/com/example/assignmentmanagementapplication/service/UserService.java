@@ -39,7 +39,6 @@ public class UserService {
         if (userRepository.existsByEmail(user.getEmail())) {
             throw new RuntimeException("Корисник со оваа email адреса веќе постои: " + user.getEmail());
         }
-
         // За студенти, проверка дали индексот веќе постои
         if (user.getRole() == UserRole.СТУДЕНТ && user.getIndexNumber() != null) {
             if (userRepository.existsByIndexNumber(user.getIndexNumber())) {
@@ -104,6 +103,15 @@ public class UserService {
     }
     public List<User> findStudentsBySubjectId(Long subjectId) {
         return userRepository.findStudentsBySubjectId(subjectId);
+    }
+
+    public User authenticate(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+        if (!user.getPassword().equals(password)) { // ако имаш hash, BCrypt.checkpw
+            throw new RuntimeException("Invalid credentials");
+        }
+        return user;
     }
 
 }

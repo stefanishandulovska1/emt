@@ -1,5 +1,7 @@
 package com.example.assignmentmanagementapplication.web;
 
+import com.example.assignmentmanagementapplication.dto.RegisterRequestDTO;
+import com.example.assignmentmanagementapplication.dto.UserAuthRequestDTO;
 import com.example.assignmentmanagementapplication.dto.UserDTO;
 import com.example.assignmentmanagementapplication.model.User;
 import com.example.assignmentmanagementapplication.model.UserRole;
@@ -158,5 +160,24 @@ public class UserController {
         List<UserDTO> dtos = staff.stream().map(this::convertToDTO).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
+    @PostMapping("/register")
+    public ResponseEntity<UserDTO> register(@RequestBody RegisterRequestDTO req) {
+        User user = new User();
+        user.setFirstName(req.getFirstName());
+        user.setLastName(req.getLastName());
+        user.setEmail(req.getEmail());
+        user.setPassword(req.getPassword());
+        user.setRole(UserRole.valueOf(req.getRole()));
+        user.setIndexNumber(req.getIndexNumber());
+        User saved = userService.save(user);
+        return ResponseEntity.status(HttpStatus.CREATED).body(convertToDTO(saved));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<UserDTO> login(@RequestBody UserAuthRequestDTO req) {
+        User user = userService.authenticate(req.getEmail(), req.getPassword());
+        return ResponseEntity.ok(convertToDTO(user));
+    }
+
 
 }

@@ -32,6 +32,22 @@ class ApiService {
         }
     }
 
+    // AUTH API
+    async login(email, password) {
+        return this.fetchWithErrorHandling(`${API_BASE}/users/login`, {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+        });
+    }
+
+    async register(userObj) {
+        return this.fetchWithErrorHandling(`${API_BASE}/users/register`, {
+            method: 'POST',
+            body: JSON.stringify(userObj),
+        });
+    }
+
+
 
     // Subjects API
     async getSubjects() {

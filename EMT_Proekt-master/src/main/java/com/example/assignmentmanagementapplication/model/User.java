@@ -35,6 +35,10 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @NotBlank(message = "Лозинка е задолжителна")
+    private String password;
+
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserAssignment> userAssignments = new ArrayList<>();
 
@@ -80,4 +84,7 @@ public class User {
     public String getFullName() {
         return firstName + " " + lastName;
     }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
 }
