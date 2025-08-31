@@ -1,15 +1,26 @@
 package com.example.assignmentmanagementapplication.web;
 
+import com.example.assignmentmanagementapplication.model.Assignment;
 import com.example.assignmentmanagementapplication.model.Submission;
+import com.example.assignmentmanagementapplication.model.User;
+import com.example.assignmentmanagementapplication.repository.AssignmentRepository;
+import com.example.assignmentmanagementapplication.repository.UserRepository;
 import com.example.assignmentmanagementapplication.service.SubmissionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/submissions")
@@ -18,6 +29,13 @@ public class SubmissionController {
 
     @Autowired
     private SubmissionService submissionService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private AssignmentRepository assignmentRepository;
+
 
     @GetMapping
     public ResponseEntity<List<Submission>> getAllSubmissions() {
@@ -88,5 +106,81 @@ public class SubmissionController {
         List<Submission> submissions = submissionService.findByAssignmentId(assignmentId);
         if (submissions == null) submissions = new ArrayList<>();
         return ResponseEntity.ok(submissions);
+    }
+    @PostMapping("/upload/{assignmentId}/student/{studentId}")
+    public ResponseEntity<?> uploadSubmissionFile(
+            @PathVariable Long assignmentId,
+            @PathVariable Long studentId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "comments", required = false) String comments) {
+
+        Optional<Assignment> assignmentOpt = assignmentRepository.findById(assignmentId);
+        Optional<User> studentOpt = userRepository.findById(studentId);
+
+        if (assignmentOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Assignment not found");
+        }
+
+        if (studentOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Student not found");
+        }
+
+        Assignment assignment = assignmentOpt.get();
+        User student = studentOpt.get();
+
+        if (assignment.getDueDate() != null && LocalDateTime.now().isAfter(assignment.getDueDate())) {
+            return ResponseEntity.badRequest().body("Рокот за поднесување е истечен");
+        }
+
+        if (!file.getContentType().equalsIgnoreCase("application/pdf")) {
+            return ResponseEntity.badRequest().body("Само PDF датотеки се дозволени");
+        }
+
+        try {
+            Path uploadDir = Paths.get("uploads/submissions");
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+
+            String filename = LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+                    + "_" + java.util.UUID.randomUUID() + "_" + file.getOriginalFilename();
+
+            Path filePath = uploadDir.resolve(filename);
+            Files.copy(file.getInputStream(), filePath);
+
+            Optional<Submission> existing = submissionService.findByStudentAndAssignment(student.getId(), assignment.getId());
+
+            Submission submission;
+
+            if (existing.isPresent()) {
+                submission = existing.get();
+            } else {
+                submission = new Submission();
+                submission.setAssignment(assignment);
+                submission.setStudent(student);
+                submission.setSubmittedAt(LocalDateTime.now());
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            List<String> filesList;
+
+            if (submission.getSubmissionFiles() != null) {
+                filesList = mapper.readValue(submission.getSubmissionFiles(), List.class);
+            } else {
+                filesList = new ArrayList<>();
+            }
+
+            filesList.clear(); // clear existing to allow single file only; adjust if multi allowed
+            filesList.add(filePath.toString());
+
+            submission.setSubmissionFiles(mapper.writeValueAsString(filesList));
+            submission.setComments(comments);
+            submissionService.save(submission);
+
+            return ResponseEntity.ok("Поднесувањето е успешно зачувано");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Грешка при зачувување на поднесувањето");
+        }
     }
 }

@@ -11,7 +11,6 @@ const AssignmentManagementSystem = () => {
     const [subjects, setSubjects] = useState([]);
     const [assignments, setAssignments] = useState([]);
     const [users, setUsers] = useState([]);
-
     const { user, logout } = useAuth();
 
     const professors = users.filter(u => u.role === 'НАСТАВНИК');
@@ -19,6 +18,13 @@ const AssignmentManagementSystem = () => {
 
     const [userAssignments, setUserAssignments] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    const [studentSubmissions, setStudentSubmissions] = useState([]);
+    const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
+    const [submissionComment, setSubmissionComment] = useState('');
+    const [submissionFile, setSubmissionFile] = useState(null);
+    const [professorSubmissions, setProfessorSubmissions] = useState([]);
+    const [gradingData, setGradingData] = useState({});
 
     const [subjectForm, setSubjectForm] = useState({
         code: '',
@@ -110,7 +116,27 @@ const AssignmentManagementSystem = () => {
         fetchUserAssignments();
     }, []);
 
-    // Subject handlers
+    // Student: fetch own submissions for assignments
+    useEffect(() => {
+        if (user?.role === 'СТУДЕНТ' && user?.id) {
+            apiService.getSubmissionsByStudent(user.id)
+                .then(setStudentSubmissions)
+                .catch(console.error);
+        }
+    }, [assignments, user]);
+
+    // Staff: fetch assignment submissions
+    const fetchSubmissionsForAssignment = async (assignmentId) => {
+        try {
+            const subs = await apiService.getSubmissionsByAssignment(assignmentId);
+            setProfessorSubmissions(subs);
+            setSelectedAssignmentId(assignmentId);
+        } catch {
+            alert('Грешка при вчитување на поднесувања');
+        }
+    };
+
+    // Subject CRUD
     const handleSubjectSubmit = async (e) => {
         e.preventDefault();
         if (!['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role)) {
@@ -171,7 +197,7 @@ const AssignmentManagementSystem = () => {
         }
     };
 
-    // Assignment handlers
+    // Assignment CRUD
     const handleAssignmentSubmit = async (e) => {
         e.preventDefault();
         if (!['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role)) {
@@ -233,7 +259,7 @@ const AssignmentManagementSystem = () => {
         }
     };
 
-    // User handlers
+    // Users CRUD
     const handleUserSubmit = async (e) => {
         e.preventDefault();
         if (!['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role)) {
@@ -287,7 +313,7 @@ const AssignmentManagementSystem = () => {
         }
     };
 
-    // Search functions
+    // Search
     const handleSearch = async (type, term) => {
         if (!term.trim()) {
             if (type === 'subjects') fetchSubjects();
@@ -296,18 +322,9 @@ const AssignmentManagementSystem = () => {
             return;
         }
         try {
-            if (type === 'subjects') {
-                const data = await apiService.searchSubjects(term);
-                setSubjects(data);
-            }
-            if (type === 'assignments') {
-                const data = await apiService.searchAssignments(term);
-                setAssignments(data);
-            }
-            if (type === 'users') {
-                const data = await apiService.searchUsers(term);
-                setUsers(data);
-            }
+            if (type === 'subjects') setSubjects(await apiService.searchSubjects(term));
+            if (type === 'assignments') setAssignments(await apiService.searchAssignments(term));
+            if (type === 'users') setUsers(await apiService.searchUsers(term));
         } catch {
             alert(`Грешка при пребарување ${type}`);
         }
@@ -380,13 +397,14 @@ const AssignmentManagementSystem = () => {
         </div>
     );
 
+    // ------------------ RETURN ------------------
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100">
             <div className="container mx-auto px-4 pt-6 flex justify-end items-center">
                 {user && user.role === 'СТУДЕНТ' && (
                     <span className="bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-full px-4 py-2 text-base font-semibold shadow mr-2">
-            Индекс: {user.indexNumber || 'Нема внесен број'}
-          </span>
+                        Индекс: {user.indexNumber || 'Нема внесен број'}
+                    </span>
                 )}
                 {user && (
                     <button
@@ -397,7 +415,6 @@ const AssignmentManagementSystem = () => {
                     </button>
                 )}
             </div>
-
             <div className="container mx-auto px-4 py-8">
                 {/* Header */}
                 <div className="bg-white rounded-2xl shadow-lg mb-8 overflow-hidden">
@@ -452,8 +469,7 @@ const AssignmentManagementSystem = () => {
                                     <div>Вкупно Задачи</div>
                                 </div>
                             </div>
-
-                            {/* Subject Form - only for staff */}
+                            {/* Subject Form - samo staff */}
                             {['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role) && (
                                 <div className="bg-gray-50 p-6 rounded-xl mb-8" ref={subjectFormRef}>
                                     <h3 className="text-xl font-semibold mb-4 flex items-center">
@@ -461,45 +477,23 @@ const AssignmentManagementSystem = () => {
                                         {editingItem ? 'Ажурирај предмет' : 'Додај предмет'}
                                     </h3>
                                     <form onSubmit={handleSubjectSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <input
-                                            type="text"
-                                            placeholder="Код на предмет"
-                                            value={subjectForm.code}
-                                            onChange={e => setSubjectForm({ ...subjectForm, code: e.target.value })}
-                                            required
-                                            className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Име на предмет"
-                                            value={subjectForm.name}
-                                            onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })}
-                                            required
-                                            className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Семестар (e.g., 2024/1)"
-                                            value={subjectForm.semester}
-                                            onChange={e => setSubjectForm({ ...subjectForm, semester: e.target.value })}
-                                            required
-                                            className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <select
-                                            value={subjectForm.year}
-                                            onChange={e => setSubjectForm({ ...subjectForm, year: Number(e.target.value) })}
-                                            className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        >
-                                            {[1,2,3,4].map(y => (
+                                        <input type="text" placeholder="Код на предмет" value={subjectForm.code}
+                                               onChange={e => setSubjectForm({ ...subjectForm, code: e.target.value })} required
+                                               className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                        <input type="text" placeholder="Име на предмет" value={subjectForm.name}
+                                               onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })} required
+                                               className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                        <input type="text" placeholder="Семестар (e.g., 2024/1)" value={subjectForm.semester}
+                                               onChange={e => setSubjectForm({ ...subjectForm, semester: e.target.value })} required
+                                               className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                        <select value={subjectForm.year} onChange={e => setSubjectForm({ ...subjectForm, year: Number(e.target.value) })}
+                                                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                            {[1, 2, 3, 4].map(y => (
                                                 <option key={y} value={y}>{y}. година</option>
                                             ))}
                                         </select>
-                                        <select
-                                            required
-                                            value={subjectForm.professor}
-                                            onChange={e => setSubjectForm({ ...subjectForm, professor: e.target.value })}
-                                            className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        >
+                                        <select required value={subjectForm.professor} onChange={e => setSubjectForm({ ...subjectForm, professor: e.target.value })}
+                                                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                             <option value="">Избери професор</option>
                                             {professors.map(prof => (
                                                 <option key={prof.id} value={`${prof.firstName} ${prof.lastName}`}>
@@ -507,11 +501,8 @@ const AssignmentManagementSystem = () => {
                                                 </option>
                                             ))}
                                         </select>
-                                        <select
-                                            value={subjectForm.assistant}
-                                            onChange={e => setSubjectForm({ ...subjectForm, assistant: e.target.value })}
-                                            className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        >
+                                        <select value={subjectForm.assistant} onChange={e => setSubjectForm({ ...subjectForm, assistant: e.target.value })}
+                                                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                             <option value="">Избери асистент</option>
                                             {assistants.map(ast => (
                                                 <option key={ast.id} value={`${ast.firstName} ${ast.lastName}`}>
@@ -520,29 +511,21 @@ const AssignmentManagementSystem = () => {
                                             ))}
                                         </select>
                                         <div className="flex space-x-2 md:col-span-3">
-                                            <button
-                                                type="submit"
-                                                className="flex-1 bg-blue-500 text-white rounded-lg p-3 hover:bg-blue-600 transition"
-                                            >
+                                            <button type="submit" className="flex-1 bg-blue-500 text-white rounded-lg p-3 hover:bg-blue-600 transition">
                                                 {editingItem ? 'Ажурирај' : 'Додај'}
                                             </button>
                                             {editingItem && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setEditingItem(null);
-                                                        setSubjectForm({ code: '', name: '', semester: '', year: 1, professor: '', assistant: '' });
-                                                    }}
-                                                    className="bg-gray-500 text-white rounded-lg p-3 hover:bg-gray-600 transition"
-                                                >
-                                                    Откажи
-                                                </button>
+                                                <button type="button" onClick={() => {
+                                                    setEditingItem(null);
+                                                    setSubjectForm({ code: '', name: '', semester: '', year: 1, professor: '', assistant: '' });
+                                                }}
+                                                        className="bg-gray-500 text-white rounded-lg p-3 hover:bg-gray-600 transition"
+                                                >Откажи</button>
                                             )}
                                         </div>
                                     </form>
                                 </div>
                             )}
-
                             {/* Search and Export */}
                             <div className="flex flex-wrap gap-4 mb-6">
                                 <div className="flex-1 relative">
@@ -569,25 +552,23 @@ const AssignmentManagementSystem = () => {
                                 >
                                     <Download size={16} /> <span>JSON</span>
                                 </button>
-                                {/* Export students per role - staff only */}
-                                {['НАСТАВНИК','АСИСТЕНТ'].includes(user?.role) && (
+                                {['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role) && (
                                     <>
                                         <button
-                                            onClick={() => exportToCSV(users.filter(u=>u.role==='СТУДЕНТ'), 'studenti')}
+                                            onClick={() => exportToCSV(users.filter(u => u.role === 'СТУДЕНТ'), 'studenti')}
                                             className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
                                         >Студенти CSV</button>
                                         <button
-                                            onClick={() => exportToCSV(users.filter(u=>u.role==='НАСТАВНИК'), 'profesori')}
+                                            onClick={() => exportToCSV(users.filter(u => u.role === 'НАСТАВНИК'), 'profesori')}
                                             className="bg-purple-700 text-white px-4 py-2 rounded-lg hover:bg-purple-800"
                                         >Професори CSV</button>
                                         <button
-                                            onClick={() => exportToCSV(users.filter(u=>u.role==='АСИСТЕНТ'), 'asistenti')}
+                                            onClick={() => exportToCSV(users.filter(u => u.role === 'АСИСТЕНТ'), 'asistenti')}
                                             className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700"
                                         >Асистенти CSV</button>
                                     </>
                                 )}
                             </div>
-
                             {/* Subjects List */}
                             <div className="grid gap-4">
                                 {getFilteredSubjects().map(subject => (
@@ -653,8 +634,7 @@ const AssignmentManagementSystem = () => {
                                     <div>Завршени</div>
                                 </div>
                             </div>
-
-                            {/* Assignment Form - only staff */}
+                            {/* Assignment Form - samo staff */}
                             {['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role) && (
                                 <div className="bg-gray-50 p-6 rounded-xl mb-8" ref={assignmentFormRef}>
                                     <h3 className="text-xl font-semibold mb-4 flex items-center">
@@ -663,25 +643,12 @@ const AssignmentManagementSystem = () => {
                                     </h3>
                                     <form onSubmit={handleAssignmentSubmit} className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input
-                                                type="text"
-                                                placeholder="Наслов"
-                                                value={assignmentForm.title}
-                                                onChange={e => setAssignmentForm({ ...assignmentForm, title: e.target.value })}
-                                                required
-                                                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Број поени"
-                                                value={assignmentForm.points}
-                                                min={1} max={100}
-                                                onChange={e =>
-                                                    setAssignmentForm({ ...assignmentForm, points: e.target.value === '' ? '1' : e.target.value })
-                                                }
-                                                required
-                                                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                            />
+                                            <input type="text" placeholder="Наслов" value={assignmentForm.title}
+                                                   onChange={e => setAssignmentForm({ ...assignmentForm, title: e.target.value })} required
+                                                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
+                                            <input type="number" placeholder="Број поени" value={assignmentForm.points} min={1} max={100}
+                                                   onChange={e => setAssignmentForm({ ...assignmentForm, points: e.target.value === '' ? '1' : e.target.value })} required
+                                                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
                                         </div>
                                         <textarea
                                             placeholder="Краток опис"
@@ -715,23 +682,15 @@ const AssignmentManagementSystem = () => {
                                             ))}
                                         </select>
                                         <div className="flex space-x-2">
-                                            <button
-                                                type="submit"
-                                                className="flex-1 bg-purple-500 text-white rounded-lg p-3 hover:bg-purple-600"
-                                            >
+                                            <button type="submit" className="flex-1 bg-purple-500 text-white rounded-lg p-3 hover:bg-purple-600">
                                                 {editingItem ? 'Ажурирај' : 'Додај'}
                                             </button>
                                             {editingItem && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        setEditingItem(null);
-                                                        setAssignmentForm({ title: '', description: '', points: '1', requirements: '', subjectId: '', dueDate: '' });
-                                                    }}
+                                                    onClick={() => { setEditingItem(null); setAssignmentForm({ title: '', description: '', points: '1', requirements: '', subjectId: '', dueDate: '' }); }}
                                                     className="bg-gray-500 text-white rounded-lg p-3 hover:bg-gray-600"
-                                                >
-                                                    Откажи
-                                                </button>
+                                                >Откажи</button>
                                             )}
                                         </div>
                                     </form>
@@ -760,48 +719,128 @@ const AssignmentManagementSystem = () => {
                                 </button>
                             </div>
 
-                            {/* List */}
+                            {/* Assignments List */}
                             <div className="grid gap-4">
-                                {getFilteredAssignments().map(a => (
-                                    <div key={a.id} className="bg-white p-6 rounded shadow border-l-4 border-purple-500">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <h3 className="text-xl font-semibold">{a.title}</h3>
-                                                <p className="text-purple-600 font-medium">{a.subjectCode} - {a.subjectName}</p>
+                                {getFilteredAssignments().map((assignment) => {
+                                    const submission = studentSubmissions.find(s => s.assignment.id === assignment.id);
+                                    const dueDate = new Date(assignment.dueDate);
+                                    const now = new Date();
+
+                                    return (
+                                        <div key={assignment.id} className="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+                                            <div className="flex justify-between">
+                                                <div>
+                                                    <h4 className="text-xl font-bold text-purple-900">{assignment.title}</h4>
+                                                    <div className="text-purple-800">{assignment.subjectCode} - {assignment.subjectName}</div>
+                                                </div>
+                                                <div>
+                                                    <span className="bg-purple-200 px-3 py-1 rounded-full text-purple-800 text-sm font-bold mr-2">{assignment.points} поени</span>
+                                                    {assignment.averageGrade && (
+                                                        <span className="bg-green-100 px-3 py-1 rounded-full text-green-800 text-sm font-bold">
+                                                            Просек: {assignment.averageGrade.toFixed(1)}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="flex space-x-2">
-                                                <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded">{a.points} поени</span>
-                                                {a.averageGrade !== undefined && a.averageGrade !== null && (
-                                                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded">Просек: {a.averageGrade.toFixed(1)}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {a.description && <p className="mb-3">{a.description}</p>}
-                                        {a.requirements && (
-                                            <div className="bg-gray-100 rounded p-3 mb-4">
-                                                <b>Бајанија:</b>
-                                                <p className="text-sm">{a.requirements}</p>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between items-center">
-                                            <div className="text-sm text-gray-500">
-                                                Создадено: {new Date(a.createdAt).toLocaleDateString('mk-MK')}
-                                                {a.submissionCount > 0 && <span className="ml-4">Поднесени: {a.submissionCount}</span>}
-                                            </div>
-                                            {['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role) && (
-                                                <div className="flex space-x-2">
-                                                    <button onClick={() => handleAssignmentEdit(a)} className="flex items-center bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 space-x-1">
-                                                        <Edit size={16} /><span>Уреди</span>
-                                                    </button>
-                                                    <button onClick={() => handleAssignmentDelete(a.id)} className="flex items-center bg-red-500 px-3 py-1 rounded text-white hover:bg-red-600 space-x-1">
-                                                        <Trash2 size={16} /><span>Избриши</span>
-                                                    </button>
+                                            {assignment.description && <div className="mt-2">{assignment.description}</div>}
+                                            {assignment.requirements && (
+                                                <div className="mt-2 bg-gray-50 rounded p-3 text-sm">
+                                                    <strong>Барања:</strong> {assignment.requirements}
                                                 </div>
                                             )}
+                                            <div className="text-sm text-gray-500 mt-2 mb-1">
+                                                Краен рок: {dueDate.toLocaleString('mk-MK')}
+                                            </div>
+                                            {/* === Student upload form & display === */}
+                                            {user?.role === "СТУДЕНТ" && (
+                                                <>
+                                                    {now < dueDate ? (
+                                                        <form
+                                                            onSubmit={async e => {
+                                                                e.preventDefault();
+                                                                if (!submissionFile) {
+                                                                    alert('Ве молиме изберете PDF датотека');
+                                                                    return;
+                                                                }
+                                                                if (submissionFile.type !== 'application/pdf') {
+                                                                    alert('Само PDF датотеки се дозволени');
+                                                                    return;
+                                                                }
+                                                                setLoading(true);
+                                                                try {
+                                                                    await apiService.uploadSubmissionFile(
+                                                                        assignment.id, user.id, submissionFile, submissionComment
+                                                                    );
+                                                                    alert('Поднесувањето е успешно прикачено');
+                                                                    const updatedSubs = await apiService.getSubmissionsByStudent(user.id);
+                                                                    setStudentSubmissions(updatedSubs);
+                                                                    setSubmissionFile(null);
+                                                                    setSubmissionComment('');
+                                                                } catch {
+                                                                    alert('Грешка при прикачување');
+                                                                } finally {
+                                                                    setLoading(false);
+                                                                }
+                                                            }}
+                                                            className="mb-2"
+                                                        >
+                                                            <input
+                                                                type="file"
+                                                                accept="application/pdf"
+                                                                onChange={e => setSubmissionFile(e.target.files[0])}
+                                                                className="block mb-2"
+                                                            />
+                                                            <textarea
+                                                                placeholder="Коментари..."
+                                                                value={submissionComment}
+                                                                onChange={e => setSubmissionComment(e.target.value)}
+                                                                className="w-full p-2 border mt-2 mb-2"
+                                                            />
+                                                            <button
+                                                                type="submit"
+                                                                className="mt-2 bg-purple-600 text-white px-4 py-2 rounded"
+                                                                disabled={loading}
+                                                            >
+                                                                {submission ? 'Ажурирај Поднесување' : 'Поднеси Assignment'}
+                                                            </button>
+                                                        </form>
+                                                    ) : (
+                                                        <p className="text-red-600">Рокот за поднесување е истечен.</p>
+                                                    )}
+                                                    {submission && (
+                                                        <div className="mt-2 p-2 border rounded">
+                                                            <p><strong>Вашето поднесување:</strong></p>
+                                                            <p>Коментари: {submission.comments || 'Нема'}</p>
+                                                            {submission.submissionFiles && (
+                                                                <a
+                                                                    href={submission.submissionFiles}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 underline"
+                                                                >
+                                                                    Прегледај PDF
+                                                                </a>
+                                                            )}
+                                                            {submission.grade !== null && <p>Оценка: {submission.grade}</p>}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                            {/* Staff: see submissions button */}
+                                            {(['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role)) && (
+                                                <button
+                                                    onClick={() => fetchSubmissionsForAssignment(assignment.id)}
+                                                    className="mt-4 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                >
+                                                    Види поднесувања
+                                                </button>
+                                            )}
                                         </div>
-                                    </div>
-                                ))}
-                                {getFilteredAssignments().length === 0 && <div className="text-center text-gray-500 py-8">Нема задачи</div>}
+                                    );
+                                })}
+                                {getFilteredAssignments().length === 0 && (
+                                    <div className="text-center text-gray-500 py-8">Нема задачи</div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -824,8 +863,7 @@ const AssignmentManagementSystem = () => {
                                     <div>Наставници/Асистенти</div>
                                 </div>
                             </div>
-
-                            {/* User Form - only staff */}
+                            {/* User Form - samo staff */}
                             {['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role) && (
                                 <div className="bg-gray-50 p-6 rounded-xl mb-8" ref={userFormRef}>
                                     <h3 className="text-xl font-semibold mb-4 flex items-center">
@@ -834,21 +872,15 @@ const AssignmentManagementSystem = () => {
                                     </h3>
                                     <form onSubmit={handleUserSubmit} className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input
-                                                type="text"
-                                                placeholder="Име"
-                                                value={userForm.firstName}
-                                                onChange={e => setUserForm({ ...userForm, firstName: e.target.value })}
-                                                required
-                                                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            <input type="text" placeholder="Име" value={userForm.firstName}
+                                                   onChange={e => setUserForm({ ...userForm, firstName: e.target.value })}
+                                                   required
+                                                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                             />
-                                            <input
-                                                type="text"
-                                                placeholder="Презиме"
-                                                value={userForm.lastName}
-                                                onChange={e => setUserForm({ ...userForm, lastName: e.target.value })}
-                                                required
-                                                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            <input type="text" placeholder="Презиме" value={userForm.lastName}
+                                                   onChange={e => setUserForm({ ...userForm, lastName: e.target.value })}
+                                                   required
+                                                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                             />
                                         </div>
                                         <input
@@ -880,10 +912,7 @@ const AssignmentManagementSystem = () => {
                                             )}
                                         </div>
                                         <div className="flex space-x-2">
-                                            <button
-                                                type="submit"
-                                                className="flex-1 bg-blue-500 text-white rounded-lg p-3 hover:bg-blue-600"
-                                            >
+                                            <button type="submit" className="flex-1 bg-blue-500 text-white rounded-lg p-3 hover:bg-blue-600">
                                                 {editingItem ? 'Ажурирај' : 'Додај'}
                                             </button>
                                             {editingItem && (
@@ -894,9 +923,7 @@ const AssignmentManagementSystem = () => {
                                                         setUserForm({ firstName: '', lastName: '', email: '', role: 'СТУДЕНТ', indexNumber: '' });
                                                     }}
                                                     className="bg-gray-500 text-white rounded-lg p-3 hover:bg-gray-600"
-                                                >
-                                                    Откажи
-                                                </button>
+                                                >Откажи</button>
                                             )}
                                         </div>
                                     </form>
@@ -917,7 +944,6 @@ const AssignmentManagementSystem = () => {
                                         className="w-full p-3 pl-10 border border-gray-300 rounded-lg"
                                     />
                                 </div>
-
                                 <button onClick={() => exportToCSV(users, 'korisnici')} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center space-x-2">
                                     <Download size={16} /> <span>CSV</span>
                                 </button>
@@ -932,7 +958,6 @@ const AssignmentManagementSystem = () => {
                                     </>
                                 )}
                             </div>
-
                             {/* List of users */}
                             <div className="grid gap-4">
                                 {getFilteredUsers().map(u => (
@@ -943,13 +968,13 @@ const AssignmentManagementSystem = () => {
                                                 <p className="text-green-600 font-medium">{u.email}</p>
                                             </div>
                                             <div className="flex items-center space-x-2">
-                        <span className={`px-3 py-1 rounded text-white text-sm ${
-                            u.role === 'СТУДЕНТ' ? 'bg-blue-500' :
-                                u.role === 'НАСТАВНИК' ? 'bg-purple-500' :
-                                    'bg-orange-500'
-                        }`}>
-                          {u.role}
-                        </span>
+                                                <span className={`px-3 py-1 rounded text-white text-sm ${
+                                                    u.role === 'СТУДЕНТ' ? 'bg-blue-500' :
+                                                        u.role === 'НАСТАВНИК' ? 'bg-purple-500' :
+                                                            'bg-orange-500'
+                                                }`}>
+                                                    {u.role}
+                                                </span>
                                                 {u.indexNumber && <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded text-sm">{u.indexNumber}</span>}
                                             </div>
                                         </div>
@@ -958,12 +983,8 @@ const AssignmentManagementSystem = () => {
                                         </div>
                                         {['НАСТАВНИК', 'АСИСТЕНТ'].includes(user?.role) && (
                                             <div className="flex space-x-2">
-                                                <button onClick={() => handleUserEdit(u)} className="flex items-center bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 space-x-1">
-                                                    <Edit size={16} /><span>Уреди</span>
-                                                </button>
-                                                <button onClick={() => handleUserDelete(u.id)} className="flex items-center bg-red-500 px-3 py-1 rounded text-white hover:bg-red-600 space-x-1">
-                                                    <Trash2 size={16} /><span>Избриши</span>
-                                                </button>
+                                                <button onClick={() => handleUserEdit(u)} className="flex items-center bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 space-x-1"><Edit size={16} /><span>Уреди</span></button>
+                                                <button onClick={() => handleUserDelete(u.id)} className="flex items-center bg-red-500 px-3 py-1 rounded text-white hover:bg-red-600 space-x-1"><Trash2 size={16} /><span>Избриши</span></button>
                                             </div>
                                         )}
                                     </div>
@@ -1002,7 +1023,6 @@ const AssignmentManagementSystem = () => {
                                     <div>Просек Оценка</div>
                                 </div>
                             </div>
-
                             {/* More analytics... */}
                         </div>
                     )}

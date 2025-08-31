@@ -5,15 +5,22 @@ class ApiService {
     // Helper method за HTTP барања
     async fetchWithErrorHandling(url, options = {}) {
         try {
+
+            const token = this.getAuthToken();
             const response = await fetch(url, {
                 headers: {
                     'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': 'Bearer ${token}' }),
                     ...options.headers,
                 },
                 ...options,
             });
 
             if (!response.ok) {
+                if (response.status === 401) {
+                    this.handleAuthError();
+                    throw new Error('Authentication failed');
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
@@ -45,6 +52,19 @@ class ApiService {
             method: 'POST',
             body: JSON.stringify(userObj),
         });
+    }
+    getAuthToken() {
+        return localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+    }
+
+    handleAuthError() {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('userRole');
+        sessionStorage.removeItem('authToken');
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
     }
 
 
@@ -142,6 +162,56 @@ class ApiService {
     // User Assignments API
     async getUserAssignments() {
         return this.fetchWithErrorHandling(`${API_BASE}/submissions`);
+    }
+
+// New: Submission upload with file + comments
+    async uploadSubmissionFile(assignmentId, studentId, file, comments) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('comments', comments || '');
+
+        const token = this.getAuthToken();
+
+        const response = await fetch(`${API_BASE}/submissions/upload/${assignmentId}/student/${studentId}`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error('Грешка при прикачување на поднесување');
+        }
+
+        return await response.json();
+    }
+
+    async getSubmissionsByStudent(studentId) {
+        return this.fetchWithErrorHandling(`${API_BASE}/submissions/student/${studentId}`);
+    }
+
+    async getSubmissionsByAssignment(assignmentId) {
+        return this.fetchWithErrorHandling(`${API_BASE}/submissions/assignment/${assignmentId}`);
+    }
+
+    // Grade and comment on submission
+    async gradeSubmission(submissionId, grade, comments) {
+        const token = this.getAuthToken();
+
+        const response = await fetch(
+            `${API_BASE}/submissions/${submissionId}/grade?grade=${grade}&comments=${encodeURIComponent(comments || '')}`,
+            {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Грешка при додавање оцена');
+        }
+
+        return await response.json();
     }
 }
 
